@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird 遊戲（帶音效）</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #gameArea {
+            width: 100vw; /* 佔滿視窗寬度 */
+            height: 100vh; /* 佔滿視窗高度 */
+            background-image: url('./bg.jpg'); /* 替換為你的背景圖片 URL */
+            background-size: cover; /* 確保背景圖片覆蓋整個區域 */
+            background-position: center; /* 置中顯示圖片 */
+            background-repeat: no-repeat; /* 不重複顯示背景圖片 */
+        }
+
+        #bird {
+            width: 40px;
+            height: 40px;
+            position: absolute;
+            top: 50%;
+            left: 20%;
+        }
+
+        #bird img{
+            width: 100%;
+            height: 100%;
+            user-select: none;
+        }
+
+        .pipe {
+            width: 50px;
+            background-color: green;
+            position: absolute;
+            bottom: 0;
+            animation: movePipe 1.6s linear infinite;
+        }
+
+        .pipe-top {
+            position: absolute;
+            top: 0;
+            height: 200px;
+            background-color: green;
+            width: 50px;
+            animation: movePipe 1.6s linear infinite;
+        }
+
+        @keyframes movePipe {
+            from {
+                right: -50px;
+            }
+            to {
+                right: 100vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameArea">
+        <div id="score" style="user-select: none;position: absolute; top: 20px; left: 0px; right: 0; margin: auto; font-size: 24px; color: white; width: fit-content; z-index: 300;">分數: 0</div>
+
+        <div id="bird">
+            <img src="./lebron-my-only-sunshine-like-the-sun-hes-hot-v0-f7hnpexierrc1.webp" alt="">
+        </div>
+    </div>
+    <audio id="backgroundMusic" src="videoplayback.m4a" preload="auto"></audio>
+
+    <!-- 音效元素 -->
+    <audio id="flapSound" src="flap_out.m4a" preload="auto"></audio> <!-- 飛行音效 -->
+    <audio id="hitSound" src="hit.mp3" preload="auto"></audio>  <!-- 撞擊音效 -->
+
+    <script>
+        $(document).ready(function () {
+            let bird = $('#bird');
+            let gameArea = $('#gameArea');
+            let gravity = 8; // 重力，讓鳥下落的速度
+            let birdTop = bird.position().top; // 鳥的初始位置
+            let isGameOver = false;
+            playBackgroundMusic();
+            // 取得音效元素
+            let flapSound = document.getElementById('flapSound');
+            flapSound.volumn = 1.4;
+            let hitSound = document.getElementById('hitSound');
+            let score = 0; // 分數變量
+            let scoreDisplay = $('#score'); // 取得分數顯示元素
+
+            // 鳥飛行的函數
+            function flyUp() {
+                birdTop -= 45; // 鳥每次上升的距離
+                bird.css('top', birdTop + 'px');
+                flapSound.currentTime = 0;
+                flapSound.play(); // 播放飛行音效
+            }
+
+            // 監聽鍵盤點擊事件或點擊螢幕，讓鳥飛
+            $(document).on('keydown click', function () {
+                if (!isGameOver) {
+                    flyUp();
+                }
+            });
+
+            // 重力讓鳥下落
+            function applyGravity() {
+                birdTop += gravity; // 鳥不點擊時向下移動
+                bird.css('top', birdTop + 'px');
+
+                // 如果鳥觸碰到地面或飛出頂部，遊戲結束
+                if (birdTop > gameArea.height() - bird.height() || birdTop < 0) {
+                    gameOver();
+                }
+            }
+
+            // 創建障礙物
+            function createPipes() {
+                let pipeHeight = Math.floor(Math.random() * 300) + 50;
+                let gapHeight = 400;
+
+                // 下方的管道
+                let pipe = $('<div class="pipe"></div>');
+                pipe.css({ height: pipeHeight + 'px', right: '-50px' });
+
+                // 上方的管道
+                let pipeTop = $('<div class="pipe-top"></div>');
+                pipeTop.css({ height: gameArea.height() - pipeHeight - gapHeight + 'px', right: '-50px' });
+
+                gameArea.append(pipe);
+                gameArea.append(pipeTop);
+
+                // 移除過去的管道，節省資源
+                pipe.on('animationend', function () {
+                    $(this).remove();
+                });
+                pipeTop.on('animationend', function () {
+                    $(this).remove();
+                });
+
+                // 每次生成新的障礙物檢查是否碰撞
+                let checkCollision = setInterval(function () {
+                    let pipePos = pipe.position().left;
+                    let pipeTopPos = pipeTop.position().left;
+
+                    if (
+                        pipePos < bird.position().left + bird.width() &&
+                        pipePos + pipe.width() > bird.position().left &&
+                        (bird.position().top + bird.height() > gameArea.height() - pipeHeight ||
+                            bird.position().top < pipeTop.height())
+                    ) {
+                        gameOver();
+                    }
+                                    // 檢查是否通過管道，增加分數
+                    if (pipePos + pipe.width() < bird.position().left && !pipe.data('scored')) {
+                        score++; // 增加分數
+                        scoreDisplay.text('分數: ' + score); // 更新分數顯示
+                        pipe.data('scored', true); // 標記為已經計分，避免重複計分
+                    }
+
+                    if (pipePos <= 0) {
+                        clearInterval(checkCollision);
+                    }
+                }, 10);
+            }
+
+            // 遊戲結束的函數
+            function gameOver() {
+                isGameOver = true;
+                hitSound.play(); // 播放撞擊音效
+                alert('Lebron James !');
+                location.reload(); // 重新加載遊戲
+            }
+
+            // 每隔 100 毫秒執行一次重力作用
+            let gameLoop = setInterval(function () {
+                if (!isGameOver) {
+                    applyGravity();
+                }
+            }, 100);
+
+            // 每 2 秒生成一個新的障礙物
+            let pipeLoop = setInterval(function () {
+                if (!isGameOver) {
+                    createPipes();
+                }
+            }, 800);
+
+
+
+            function playBackgroundMusic() {
+                let backgroundMusic = document.getElementById('backgroundMusic'); // 取得音樂元素
+                backgroundMusic.loop = true; // 設置音樂循環播放
+                backgroundMusic.currentTime = 4;
+                backgroundMusic.play(); // 開始播放音樂
+            }
+        });
+    </script>
+</body>
+</html>
